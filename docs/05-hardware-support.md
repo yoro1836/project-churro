@@ -439,7 +439,7 @@ three lines in `features/gfx-mesa/patch-vendor.sh` are the knob.
 
 | Machine | CPU / GPU | Result |
 |---|---|---|
-| QEMU/KVM | host / virtio | boots to system_server; SurfaceFlinger crashes in softpipe (QEMU 2D virtio-gpu) |
+| QEMU/KVM | host / virtio | desktop with virgl (`virtio-gpu-gl`, "Mesa" GRUB entry; tested on a Rocket Lake host); SurfaceFlinger crashes in softpipe on QEMU's 2D virtio-gpu |
 | Asus T300FA | Core M-5Y10 / HD 5300 | not bootable (CPU floor) |
 | Asus VivoBook 15 (X513EA) | i7-1165G7 Tiger Lake / Iris Xe | boots with the `#UD` emulator (slow: `vpdpwssd` traps); setup wizard Wi-Fi stalls fixed by IOMMU passthrough |
 | HP AiO | older Intel | `init` invalid opcode (CPU floor) |

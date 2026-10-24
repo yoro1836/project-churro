@@ -475,6 +475,8 @@ it in order; each step says where the assumption lives and how to check it.
    → the card is legacy HDA id `Intel`; expect `snd_hda_codec_generic … autoconfig`, the logcat
    success line above, and `/tmp/q.wav` growing past its 44-byte header once Android opens a
    stream. SurfaceFlinger crash loops in QEMU are a known softpipe issue, not a regression.
+   For a working display use virgl: `VNC=none GPU_ARGS="-vga none -device virtio-gpu-gl-pci"
+   QEMU_EXTRA="-display gtk,gl=on"` and the "Mesa (… virgl)" entry under "Graphics: other stacks".
    Logs: CHURRO-LOG partition (`boot.log`, `logcat.log`).
 7. **Then hardware**, always first with the debug GRUB entry (only it writes the logs).
 
