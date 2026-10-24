@@ -8,7 +8,9 @@
 #   i.e. the "no GPU driver" case: simpledrm + vgem + Mesa software rendering)
 #   The image is not modified (QEMU snapshot: a first boot formats /data); SNAPSHOT=off keeps changes.
 #   DISK_DEV=usb-storage boots it like a USB stick (default: NVMe). MEM sets guest RAM (default 6G).
-#   VNC=none drops the VNC display (needed with a GL display: QEMU_EXTRA="-display gtk,gl=on").
+#   VNC=none drops the VNC display (needed with a GL display: QEMU_EXTRA="-display sdl,gl=on").
+#   POINTER=usb-mouse: Android draws its mouse pointer only for a relative mouse (usb-tablet is
+#   absolute and gets no pointer).
 set -euo pipefail
 IMG=$1; LOG=${2:-/tmp/churro-qemu}; mkdir -p "$LOG"
 # OVMF: Debian/Ubuntu names, else Arch/Fedora's edk2 package
@@ -25,7 +27,7 @@ VNCARGS=(-vnc "${VNC:-127.0.0.1:5}"); [ "${VNC:-}" = none ] && VNCARGS=()
 exec qemu-system-x86_64 -enable-kvm -machine q35 -cpu host -smp 4 -m ${MEM:-6G} \
   -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
   -drive if=pflash,format=raw,file="$LOG/vars.fd" \
-  -device qemu-xhci -device usb-kbd -device usb-tablet \
+  -device qemu-xhci -device usb-kbd -device ${POINTER:-usb-tablet} \
   -drive if=none,id=d0,format=raw,file="$IMG",snapshot=${SNAPSHOT:-on} -device ${DISK_DEV:-nvme,serial=churro0},drive=d0 \
   ${GPU_ARGS:--device virtio-gpu-pci} \
   -netdev user,id=n0 -device e1000e,netdev=n0 "${TPMARGS[@]}" \
