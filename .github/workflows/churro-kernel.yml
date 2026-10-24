@@ -1,0 +1,57 @@
+# Build the Churro kernel on a GitHub runner (public repo: 4 vCPU / 16 GB) instead of locally.
+#   1. sudo tools/ci/kernel-inputs.sh <recovery.bin>   -> ci-inputs/ (small text files)
+#   2. commit + push ci-inputs/ to your fork            -> this workflow runs
+#   3. download the "churro-kernel" artifact, then: sudo tools/ci/import-kernel.sh churro-kernel.zip
+name: churro-kernel
+
+on:
+  push:
+    paths: ['ci-inputs/**', 'kmod/**', 'versions.env', 'tools/ci/build-kernel-ci.sh', '.github/workflows/churro-kernel.yml']
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: kernel profile (kmod/profiles/<name>.conf)
+        default: generic
+
+jobs:
+  kernel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          df -h / /mnt 2>/dev/null || df -h /
+
+      - name: Pick the bigger disk for the cache
+        run: |
+          best=/
+          if [ -d /mnt ] && [ "$(df --output=avail /mnt | tail -1)" -gt "$(df --output=avail / | tail -1)" ]; then best=/mnt; fi
+          sudo mkdir -p "${best%/}/churro" && sudo chown "$USER" "${best%/}/churro"
+          echo "CHURRO_CACHE=${best%/}/churro" >> "$GITHUB_ENV"
+
+      - name: Host packages
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential flex bison bc rsync cpio kmod python3 perl curl git \
+            libssl-dev libelf-dev libdw-dev zlib1g-dev cmake pkg-config \
+            lz4 zstd xz-utils bzip2 binutils >/dev/null
+
+      - name: Build kernel + kABI check
+        run: bash tools/ci/build-kernel-ci.sh ci-inputs "$RUNNER_TEMP/churro-kernel.tar.zst" "${{ inputs.profile || 'generic' }}"
+
+      - name: Disk usage
+        if: always()
+        run: df -h "$CHURRO_CACHE"; du -sh "$CHURRO_CACHE"/* 2>/dev/null | sort -h | tail
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: churro-kernel
+          path: ${{ runner.temp }}/churro-kernel.tar.zst
+          compression-level: 0
+          retention-days: 7
