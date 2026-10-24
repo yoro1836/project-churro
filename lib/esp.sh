@@ -17,8 +17,10 @@ if [ -z "$root" -o ! -f "($root)/churro/grub.cfg" ]; then search --no-floppy --f
 echo "Churro: cmdpath=$cmdpath root=$root"
 configfile "($root)/churro/grub.cfg"
 EOF
+  # efi_uga is gone in GRUB 2.16 (efi_gop covers every UEFI PC)
+  local uga=; [ -f /usr/lib/grub/x86_64-efi/efi_uga.mod ] && uga=efi_uga
   grub-mkstandalone -O x86_64-efi -o "$mnt/EFI/BOOT/BOOTX64.EFI" \
-    --modules="part_gpt part_msdos fat normal linux echo all_video efi_gop efi_uga probe regexp configfile test cat efifwsetup search search_fs_file sleep setpci" \
+    --modules="part_gpt part_msdos fat normal linux echo all_video efi_gop $uga probe regexp configfile test cat efifwsetup search search_fs_file sleep setpci" \
     --locales="" --fonts="" "boot/grub/grub.cfg=$stub"
   rm -f "$stub"
 

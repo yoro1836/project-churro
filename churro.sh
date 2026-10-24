@@ -88,7 +88,7 @@ cmd_build() {
       truncate -s +$(((dsize << 30) - cur)) "$out"; grow_userdata "$out"; fi
   fi
   LOOP=$(losetup -f --show -P "$out"); udevadm settle 2>/dev/null || sleep 1
-  local W; W=$(mktemp -d /tmp/churro.XXXX); TMPDIRS="$TMPDIRS $W"
+  local W; W=$(mktemp -d "${TMPDIR:-/tmp}/churro.XXXX"); TMPDIRS="$TMPDIRS $W"
 
   log "extracting boot images (slot _a)"
   bootimg_extract "$(part boot_a)" "$W/boot"
