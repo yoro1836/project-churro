@@ -10,12 +10,17 @@ HERE=$(cd "$(dirname "$0")/../.." && pwd)
 IN=$(realpath "$1") TARBALL=$(realpath -m "$2") PROF=${3:-generic}
 C=${CHURRO_CACHE:-/var/cache/churro}; mkdir -p "$C"
 log() { echo ">> $*"; }
+# ci.android.com rate-limits (429): retry with backoff, and never leave a partial file behind
+fetch() {
+  local i; for i in 1 2 3 4 5; do curl -fsSL -o "$2.part" "$1" && { mv "$2.part" "$2"; return 0; }; sleep $((i * 20)); done
+  rm -f "$2.part"; echo "download failed: $1" >&2; return 1
+}
 G="https://android.googlesource.com"
 for f in ikconfig release gki-certs.pem; do [ -s "$IN/$f" ] || { echo "missing $IN/$f (run tools/ci/kernel-inputs.sh)" >&2; exit 1; }; done
 
 # --- 1. kernel identity (from the extracted inputs instead of the image) ---
 REL=$(cat "$IN/release"); BID=${REL##*-ab}; log "image kernel $REL (GKI build $BID)"
-[ -f "$C/manifest_$BID.xml" ] || curl -fsSL -o "$C/manifest_$BID.xml" "https://ci.android.com/builds/submitted/$BID/kernel_x86_64/latest/raw/manifest_$BID.xml"
+[ -f "$C/manifest_$BID.xml" ] || fetch "https://ci.android.com/builds/submitted/$BID/kernel_x86_64/latest/raw/manifest_$BID.xml" "$C/manifest_$BID.xml"
 rev() { grep -oE "<project [^>]*name=\"$1\"[^>]*" "$C/manifest_$BID.xml" | grep -oE 'revision="[^"]+"' | cut -d'"' -f2; }
 CLANG_NAME=clang-$(grep -oE 'based on r[0-9a-z]+' "$IN/ikconfig" | head -1 | cut -d' ' -f3)
 RUST_VER=$(grep -oE 'rustc [0-9.]+' "$IN/ikconfig" | head -1 | cut -d' ' -f2)
@@ -53,7 +58,7 @@ log "kernel cache key $KH -> $K"
 [ -f "$K/kernel" ] || CHURRO_GKI_CERTS=$IN/gki-certs.pem bash "$HERE/kmod/build-kernel.sh" "$S/common" "$S/clang" "$S/rust" "$S/bin" "$IN/ikconfig" "$REL" "$PROF" "$K"
 SV=$S/common/out-kernel-$PROF/Module.symvers
 [ -f "$K/Module.symvers" ] || cp "$SV" "$K/"
-[ -f "$C/vmlinux.symvers-$BID" ] || curl -fsSL -o "$C/vmlinux.symvers-$BID" "https://ci.android.com/builds/submitted/$BID/kernel_x86_64/latest/raw/vmlinux.symvers"
+[ -f "$C/vmlinux.symvers-$BID" ] || fetch "https://ci.android.com/builds/submitted/$BID/kernel_x86_64/latest/raw/vmlinux.symvers" "$C/vmlinux.symvers-$BID"
 bad=$(awk 'NR==FNR {crc[$2]=$1; next} ($2 in crc) && crc[$2] != $1 {n++; if (n<=5) print "   CRC differs: " $2 > "/dev/stderr"} END {print n+0}' \
       "$C/vmlinux.symvers-$BID" "$SV")
 log "kABI check: $bad of $(wc -l < "$C/vmlinux.symvers-$BID") GKI exports differ"
