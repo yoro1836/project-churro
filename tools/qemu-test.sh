@@ -7,18 +7,21 @@
 #   GPU_ARGS replaces the display device (default virtio-gpu; "-vga std" = plain framebuffer,
 #   i.e. the "no GPU driver" case: simpledrm + vgem + Mesa software rendering)
 #   The image is not modified (QEMU snapshot: a first boot formats /data); SNAPSHOT=off keeps changes.
-#   DISK_DEV=usb-storage boots it like a USB stick (default: NVMe).
+#   DISK_DEV=usb-storage boots it like a USB stick (default: NVMe). MEM sets guest RAM (default 6G).
 set -euo pipefail
 IMG=$1; LOG=${2:-/tmp/churro-qemu}; mkdir -p "$LOG"
-cp /usr/share/OVMF/OVMF_VARS_4M.fd "$LOG/vars.fd"
+# OVMF: Debian/Ubuntu names, else Arch/Fedora's edk2 package
+OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
+[ -f "$OVMF_CODE" ] || OVMF_CODE=/usr/share/edk2/x64/OVMF_CODE.4m.fd OVMF_VARS=/usr/share/edk2/x64/OVMF_VARS.4m.fd
+cp "$OVMF_VARS" "$LOG/vars.fd"
 TPMARGS=()
 if [ "${TPM:-0}" = 1 ]; then
   mkdir -p "$LOG/tpm"
   swtpm socket --tpm2 --tpmstate dir="$LOG/tpm" --ctrl type=unixio,path="$LOG/swtpm.sock" --daemon
   TPMARGS=(-chardev socket,id=chrtpm,path="$LOG/swtpm.sock" -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0)
 fi
-exec qemu-system-x86_64 -enable-kvm -machine q35 -cpu host -smp 4 -m 6G \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+exec qemu-system-x86_64 -enable-kvm -machine q35 -cpu host -smp 4 -m ${MEM:-6G} \
+  -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
   -drive if=pflash,format=raw,file="$LOG/vars.fd" \
   -device qemu-xhci -device usb-kbd -device usb-tablet \
   -drive if=none,id=d0,format=raw,file="$IMG",snapshot=${SNAPSHOT:-on} -device ${DISK_DEV:-nvme,serial=churro0},drive=d0 \
