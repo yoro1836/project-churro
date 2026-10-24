@@ -33,6 +33,21 @@ jobs:
           if [ -d /mnt ] && [ "$(df --output=avail /mnt | tail -1)" -gt "$(df --output=avail / | tail -1)" ]; then best=/mnt; fi
           sudo mkdir -p "${best%/}/churro" && sudo chown "$USER" "${best%/}/churro"
           echo "CHURRO_CACHE=${best%/}/churro" >> "$GITHUB_ENV"
+          rel=$(cat ci-inputs/release); echo "GKI_BID=${rel##*-ab}" >> "$GITHUB_ENV"
+
+      # Sources + toolchains of this GKI build (~12 min of downloads, and the servers rate-limit):
+      # pinned by the build ID, so reusable until the image moves to a new build. Not the build
+      # output (tens of GB with debug info) and no ccache (a profile change rewrites autoconf.h,
+      # which every file includes, so it would miss anyway).
+      - name: Restore sources and toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CHURRO_CACHE }}/src-${{ env.GKI_BID }}
+            !${{ env.CHURRO_CACHE }}/src-${{ env.GKI_BID }}/common/out-*
+            ${{ env.CHURRO_CACHE }}/manifest_${{ env.GKI_BID }}.xml
+            ${{ env.CHURRO_CACHE }}/vmlinux.symvers-${{ env.GKI_BID }}
+          key: churro-src-${{ env.GKI_BID }}-v1
 
       - name: Host packages
         run: |
