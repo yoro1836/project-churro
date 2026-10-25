@@ -225,7 +225,9 @@ cmd_install() {
   local isz dsz; isz=$(stat -c %s "$img"); dsz=$(blockdev --getsize64 "$dst")
   [ "$dsz" -ge "$isz" ] || die "target too small ($dsz < $isz bytes)"
   log "this ERASES $dst ($((dsz / 1024 / 1024 / 1024)) GiB). Type YES to continue:"; read -r a; [ "$a" = YES ] || die "aborted"
-  log "writing image"; dd if="$img" of="$dst" bs=4M conv=fsync,sparse status=progress
+  # no conv=sparse: it skips the image's zero blocks, so a reinstall kept the previous install's
+  # encrypted userdata and misc/metadata state next to fresh keys, and Android rebooted at /data
+  log "writing image"; dd if="$img" of="$dst" bs=4M conv=fsync status=progress
   log "growing userdata to the end of the disk"
   userdata_last "$dst"; grow_userdata "$dst"
   partprobe "$dst" 2>/dev/null || blockdev --rereadpt "$dst" || true; sleep 2
